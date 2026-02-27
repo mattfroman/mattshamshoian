@@ -422,3 +422,42 @@ h3 {
   font-size: 0.95rem;
   padding: 3rem 0;
 }
+
+/* ── Speed Tabs ───────────────────────────────────────── */
+.speed-tabs {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.speed-tab {
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.speed-tab-active {
+  background: var(--primary);
+  color: #0f172a;
+  border-color: var(--primary);
+}
+
+/* ── Music Filename ───────────────────────────────────── */
+.music-filename {
+  font-size: 0.8rem;
+  color: var(--primary);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-btn {
+  font-size: 1.1rem;
+  line-height: 1;
+}

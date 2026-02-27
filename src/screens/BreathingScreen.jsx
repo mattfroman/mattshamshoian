@@ -1,12 +1,23 @@
 import { useState, useEffect, useRef } from 'react'
+import { playInhaleSound, playExhaleSound, speakCue } from '../utils/sounds'
 
-const INHALE_DURATION = 2000  // ms
-const EXHALE_DURATION = 2000  // ms
+export default function BreathingScreen({ round, totalRounds, breathsPerRound, inhaleDuration, exhaleDuration, onDone }) {
+  const INHALE_DURATION = inhaleDuration || 2000
+  const EXHALE_DURATION = exhaleDuration || 2000
 
-export default function BreathingScreen({ round, totalRounds, breathsPerRound, onDone }) {
   const [breathCount, setBreathCount] = useState(0)
-  const [phase, setPhase] = useState('inhale') // 'inhale' | 'exhale'
+  const [phase, setPhase] = useState('inhale')
   const timerRef = useRef(null)
+  const doneCalledRef = useRef(false)
+
+  // Play sound whenever phase changes
+  useEffect(() => {
+    if (phase === 'inhale') {
+      playInhaleSound(INHALE_DURATION)
+    } else {
+      playExhaleSound(EXHALE_DURATION)
+    }
+  }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     function tick() {
@@ -19,7 +30,7 @@ export default function BreathingScreen({ round, totalRounds, breathsPerRound, o
           setBreathCount(prev => {
             const next = prev + 1
             if (next >= breathsPerRound) {
-              return prev // handled below
+              return prev
             }
             return next
           })
@@ -29,14 +40,19 @@ export default function BreathingScreen({ round, totalRounds, breathsPerRound, o
     }
     tick()
     return () => clearTimeout(timerRef.current)
-  }, [phase, breathsPerRound])
+  }, [phase, breathsPerRound, INHALE_DURATION, EXHALE_DURATION])
 
-  // When breathCount reaches breathsPerRound, advance
+  // When breathCount reaches breathsPerRound, speak cue then advance
   useEffect(() => {
-    if (breathCount >= breathsPerRound) {
+    if (breathCount >= breathsPerRound && !doneCalledRef.current) {
+      doneCalledRef.current = true
       clearTimeout(timerRef.current)
-      // small delay so last exhale animation finishes
-      const t = setTimeout(onDone, EXHALE_DURATION)
+      // Short pause, then speak voice cue, then transition
+      const t = setTimeout(() => {
+        speakCue('Breathe in... and hold.', () => {
+          setTimeout(onDone, 400)
+        })
+      }, 600)
       return () => clearTimeout(t)
     }
   }, [breathCount, breathsPerRound, onDone])
