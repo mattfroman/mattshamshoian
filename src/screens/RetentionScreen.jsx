@@ -27,21 +27,19 @@ export default function RetentionScreen({ round, totalRounds, onDone }) {
         <h2>Breath Hold</h2>
       </div>
 
-      <div className="timer-display">{display}</div>
+      {/* Tappable center circle */}
+      <button className="retention-circle" onClick={handleRelease} aria-label="Tap to release">
+        <span className="retention-timer">{display}</span>
+        <span className="retention-tap-hint">tap to release</span>
+      </button>
 
       <div className="flex-col text-center gap-sm" style={{ maxWidth: 280 }}>
         <p style={{ fontSize: '1.1rem', fontWeight: 500 }}>
-          Take a full exhale and hold your breath.
+          Hold your breath. Tap the circle when you need to breathe.
         </p>
         <p className="muted small">
           Relax your body. Hold as long as feels comfortable.
         </p>
-      </div>
-
-      <div className="mt-auto w-full flex-col" style={{ maxWidth: 360 }}>
-        <button className="btn btn-primary" onClick={handleRelease}>
-          Release — Take a Breath
-        </button>
       </div>
     </div>
   )

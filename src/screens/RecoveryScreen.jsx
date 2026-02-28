@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react'
+import { speakCue } from '../utils/sounds'
 
 const HOLD_SECONDS = 15
 const CIRCUMFERENCE = 2 * Math.PI * 54 // r=54
 
 export default function RecoveryScreen({ round, totalRounds, onDone }) {
   const [timeLeft, setTimeLeft] = useState(HOLD_SECONDS)
+
+  // Speak voice cue on mount
+  useEffect(() => {
+    speakCue('Now breathe in.')
+  }, [])
 
   useEffect(() => {
     if (timeLeft <= 0) {
@@ -42,11 +48,10 @@ export default function RecoveryScreen({ round, totalRounds, onDone }) {
 
       <div className="flex-col text-center gap-sm" style={{ maxWidth: 280 }}>
         <p style={{ fontSize: '1.1rem', fontWeight: 500 }}>
-          Take a deep breath in and hold.
+          Breathe in and hold for {HOLD_SECONDS} seconds.
         </p>
         <p className="muted small">
-          Fill your lungs completely and hold for {HOLD_SECONDS} seconds.
-          This resets your CO₂ levels.
+          Fill your lungs completely. This resets your CO₂ levels.
         </p>
       </div>
 

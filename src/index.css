@@ -423,6 +423,46 @@ h3 {
   padding: 3rem 0;
 }
 
+/* ── Retention Circle ─────────────────────────────────── */
+.retention-circle {
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, var(--accent), #4f46e5);
+  box-shadow: 0 0 60px rgba(129, 140, 248, 0.4);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 1.5rem auto;
+  transition: transform 0.1s, box-shadow 0.1s;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.retention-circle:active {
+  transform: scale(0.94);
+  box-shadow: 0 0 30px rgba(129, 140, 248, 0.25);
+}
+
+.retention-timer {
+  font-size: 3rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  line-height: 1;
+}
+
+.retention-tap-hint {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.65);
+  font-weight: 500;
+}
+
 /* ── Speed Tabs ───────────────────────────────────────── */
 .speed-tabs {
   display: flex;
