@@ -6,11 +6,32 @@ const SPEEDS = [
   { label: 'Fast', inhale: 1250, exhale: 1250 },
 ]
 
+const MUSIC_SOURCES = {
+  upload: 'upload',
+  spotify: 'spotify',
+}
+
+function toSpotifyEmbedUrl(input) {
+  if (!input) return null
+  const raw = input.trim()
+  if (!raw) return null
+
+  const trackMatch = raw.match(/spotify\.com\/track\/([A-Za-z0-9]+)/)
+  const uriMatch = raw.match(/^spotify:track:([A-Za-z0-9]+)$/)
+  const id = trackMatch?.[1] || uriMatch?.[1]
+
+  if (!id) return null
+  return `https://open.spotify.com/embed/track/${id}?utm_source=generator`
+}
+
 export default function HomeScreen({ onStart, onHistory }) {
   const [rounds, setRounds] = useState(3)
   const [breathsPerRound, setBreathsPerRound] = useState(30)
   const [speedIndex, setSpeedIndex] = useState(1) // Normal by default
+  const [musicSource, setMusicSource] = useState(MUSIC_SOURCES.upload)
   const [musicFile, setMusicFile] = useState(null)
+  const [spotifyTrackInput, setSpotifyTrackInput] = useState('')
+  const [spotifyError, setSpotifyError] = useState('')
   const fileInputRef = useRef(null)
 
   function clamp(val, min, max) {
@@ -29,13 +50,29 @@ export default function HomeScreen({ onStart, onHistory }) {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  function handleMusicSourceChange(nextSource) {
+    setMusicSource(nextSource)
+    setSpotifyError('')
+  }
+
   function handleStart() {
     const speed = SPEEDS[speedIndex]
-    let musicUrl = null
-    if (musicFile) {
-      musicUrl = URL.createObjectURL(musicFile)
+    let musicConfig = null
+
+    if (musicSource === MUSIC_SOURCES.upload && musicFile) {
+      musicConfig = { type: MUSIC_SOURCES.upload, url: URL.createObjectURL(musicFile) }
     }
-    onStart({ rounds, breathsPerRound, inhaleDuration: speed.inhale, exhaleDuration: speed.exhale }, musicUrl)
+
+    if (musicSource === MUSIC_SOURCES.spotify && spotifyTrackInput.trim()) {
+      const embedUrl = toSpotifyEmbedUrl(spotifyTrackInput)
+      if (!embedUrl) {
+        setSpotifyError('Enter a valid Spotify track URL or URI.')
+        return
+      }
+      musicConfig = { type: MUSIC_SOURCES.spotify, embedUrl }
+    }
+
+    onStart({ rounds, breathsPerRound, inhaleDuration: speed.inhale, exhaleDuration: speed.exhale }, musicConfig)
   }
 
   return (
@@ -100,31 +137,68 @@ export default function HomeScreen({ onStart, onHistory }) {
 
         <div className="divider" />
 
-        <div className="settings-row">
-          <label>Background music</label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {musicFile ? (
-              <>
-                <span className="music-filename">{musicFile.name.length > 14 ? musicFile.name.slice(0, 12) + '…' : musicFile.name}</span>
-                <button className="stepper-btn" onClick={handleRemoveMusic} title="Remove">✕</button>
-              </>
-            ) : (
+        <div className="music-settings">
+          <div className="settings-row">
+            <label>Background music</label>
+            <div className="speed-tabs">
               <button
-                className="stepper-btn upload-btn"
-                onClick={() => fileInputRef.current?.click()}
-                title="Upload music"
+                className={`speed-tab${musicSource === MUSIC_SOURCES.upload ? ' speed-tab-active' : ''}`}
+                onClick={() => handleMusicSourceChange(MUSIC_SOURCES.upload)}
               >
-                ＋
+                Upload
               </button>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="audio/*"
-              style={{ display: 'none' }}
-              onChange={handleFileChange}
-            />
+              <button
+                className={`speed-tab${musicSource === MUSIC_SOURCES.spotify ? ' speed-tab-active' : ''}`}
+                onClick={() => handleMusicSourceChange(MUSIC_SOURCES.spotify)}
+              >
+                Spotify
+              </button>
+            </div>
           </div>
+
+          {musicSource === MUSIC_SOURCES.upload ? (
+            <div className="music-row">
+              {musicFile ? (
+                <>
+                  <span className="music-filename">{musicFile.name.length > 20 ? musicFile.name.slice(0, 18) + '…' : musicFile.name}</span>
+                  <button className="stepper-btn" onClick={handleRemoveMusic} title="Remove">✕</button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className="stepper-btn upload-btn"
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Upload music"
+                  >
+                    ＋
+                  </button>
+                  <span className="small muted">Optional</span>
+                </>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="audio/*"
+                style={{ display: 'none' }}
+                onChange={handleFileChange}
+              />
+            </div>
+          ) : (
+            <div className="spotify-input-wrap">
+              <input
+                className="spotify-input"
+                type="text"
+                placeholder="Paste Spotify track URL"
+                value={spotifyTrackInput}
+                onChange={(e) => {
+                  setSpotifyTrackInput(e.target.value)
+                  if (spotifyError) setSpotifyError('')
+                }}
+              />
+              <p className="small muted">Use a track link like spotify.com/track/...</p>
+              {spotifyError && <p className="small spotify-error">{spotifyError}</p>}
+            </div>
+          )}
         </div>
       </div>
 
