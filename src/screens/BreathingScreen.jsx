@@ -5,28 +5,38 @@ export default function BreathingScreen({ round, totalRounds, breathsPerRound, i
   const INHALE = inhaleDuration || 2000
   const EXHALE = exhaleDuration || 2000
 
-  // breathCount = number of completed breath cycles
   const [breathCount, setBreathCount] = useState(0)
-  // phase: 'inhale' | 'exhale' | 'done'
   const [phase, setPhase] = useState('inhale')
   const timerRef = useRef(null)
+  const doneTimerRef = useRef(null)
+  const doneRef = useRef(false)
   const spokenRef = useRef({ ten: false, last: false })
 
-  function clear() { clearTimeout(timerRef.current) }
+  // Keep onDone in a ref so we never need it in a dependency array
+  const onDoneRef = useRef(onDone)
+  useEffect(() => { onDoneRef.current = onDone }, [onDone])
 
-  // Play sound on each phase change
+  // Cleanup both timers on unmount
+  useEffect(() => {
+    return () => {
+      clearTimeout(timerRef.current)
+      clearTimeout(doneTimerRef.current)
+    }
+  }, [])
+
+  // Play sound on phase change
   useEffect(() => {
     if (phase === 'inhale') playInhaleSound(INHALE)
     else if (phase === 'exhale') playExhaleSound(EXHALE)
   }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Breathing state machine
+  // Breathing state machine — no onDone in deps (use ref instead)
   useEffect(() => {
     if (phase === 'done') return
 
     if (phase === 'inhale') {
       timerRef.current = setTimeout(() => setPhase('exhale'), INHALE)
-      return clear
+      return () => clearTimeout(timerRef.current)
     }
 
     // phase === 'exhale'
@@ -34,13 +44,21 @@ export default function BreathingScreen({ round, totalRounds, breathsPerRound, i
       const completed = breathCount + 1
 
       if (completed >= breathsPerRound) {
-        // All breaths done — stop cycling, speak cue, transition
+        // Stop the loop immediately
         setPhase('done')
-        speakCue('Breathe in... and hold.', () => setTimeout(onDone, 500))
+        // Speak the cue — fire and forget, do NOT rely on onend (broken on mobile)
+        speakCue('Breathe in... and hold.')
+        // Always transition after a fixed delay, regardless of speech
+        doneTimerRef.current = setTimeout(() => {
+          if (!doneRef.current) {
+            doneRef.current = true
+            onDoneRef.current()
+          }
+        }, 2200)
         return
       }
 
-      // Fire voice cues right before the next inhale
+      // Voice cues before the next inhale
       const remaining = breathsPerRound - completed
       if (remaining === 10 && !spokenRef.current.ten) {
         spokenRef.current.ten = true
@@ -54,8 +72,8 @@ export default function BreathingScreen({ round, totalRounds, breathsPerRound, i
       setPhase('inhale')
     }, EXHALE)
 
-    return clear
-  }, [phase, breathCount, breathsPerRound, INHALE, EXHALE, onDone])
+    return () => clearTimeout(timerRef.current)
+  }, [phase, breathCount, breathsPerRound, INHALE, EXHALE]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const progress = breathCount / breathsPerRound
 
