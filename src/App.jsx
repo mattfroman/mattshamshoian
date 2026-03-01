@@ -12,14 +12,21 @@ export default function App() {
   const [settings, setSettings] = useState({ rounds: 3, breathsPerRound: 30, inhaleDuration: 2000, exhaleDuration: 2000 })
   const [currentRound, setCurrentRound] = useState(1)
   const [holdTimes, setHoldTimes] = useState([])
+  const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState(null)
   const bgMusicRef = useRef(null)
   const musicUrlRef = useRef(null)
 
-  function startMusic(musicUrl) {
+  function startMusic(musicConfig) {
     stopMusic()
-    if (!musicUrl) return
-    musicUrlRef.current = musicUrl
-    const audio = new Audio(musicUrl)
+    if (!musicConfig) return
+
+    if (musicConfig.type === 'spotify') {
+      setSpotifyEmbedUrl(musicConfig.embedUrl)
+      return
+    }
+
+    musicUrlRef.current = musicConfig.url
+    const audio = new Audio(musicConfig.url)
     audio.loop = true
     audio.volume = 0.3
     audio.play().catch(() => {})
@@ -35,16 +42,17 @@ export default function App() {
       URL.revokeObjectURL(musicUrlRef.current)
       musicUrlRef.current = null
     }
+    setSpotifyEmbedUrl(null)
   }
 
   // Clean up music on unmount
   useEffect(() => () => stopMusic(), [])
 
-  function startSession(newSettings, musicUrl) {
+  function startSession(newSettings, musicConfig) {
     setSettings(newSettings)
     setCurrentRound(1)
     setHoldTimes([])
-    startMusic(musicUrl)
+    startMusic(musicConfig)
     setScreen('breathing')
   }
 
@@ -73,6 +81,20 @@ export default function App() {
 
   return (
     <div className="app">
+      {spotifyEmbedUrl && (
+        <div className="spotify-player-shell">
+          <p className="spotify-player-note">Spotify background audio (press play once)</p>
+          <iframe
+            src={spotifyEmbedUrl}
+            title="Spotify player"
+            width="100%"
+            height="152"
+            frameBorder="0"
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            loading="lazy"
+          />
+        </div>
+      )}
       {screen === 'home' && (
         <HomeScreen
           onStart={startSession}
