@@ -40,6 +40,24 @@ A simple full-stack MVP where one user prompt is sent to OpenAI, Google Gemini, 
 5. **Persistence**
    - Save recent runs to a local JSON file containing prompt, normalized responses, synthesis, timestamps, model names, and errors/timeouts.
 
+
+## Easiest option: double-click start
+
+If you do not code, use one of the included starter files from the project folder:
+
+- **Mac:** double-click `start-ai-council.command`.
+- **Windows:** double-click `start-ai-council.bat`.
+
+The starter file checks that Node.js is installed, creates `.env` from `.env.example` if needed, reminds you to paste in your provider API keys, installs dependencies, builds the app, starts the server, and opens `http://localhost:8787` in your browser.
+
+You still need three API keys for the app to answer real prompts:
+
+- `OPENAI_API_KEY`
+- `GEMINI_API_KEY`
+- `ANTHROPIC_API_KEY`
+
+If the starter file opens `.env`, paste your keys into that file, save it, then double-click the starter file again.
+
 ## Getting started
 
 ```bash
