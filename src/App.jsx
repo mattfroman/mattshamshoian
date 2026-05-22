@@ -1,139 +1,159 @@
-import { useState, useRef, useEffect } from 'react'
-import HomeScreen from './screens/HomeScreen'
-import BreathingScreen from './screens/BreathingScreen'
-import RetentionScreen from './screens/RetentionScreen'
-import RecoveryScreen from './screens/RecoveryScreen'
-import SummaryScreen from './screens/SummaryScreen'
-import HistoryScreen from './screens/HistoryScreen'
+import { useEffect, useMemo, useState } from 'react'
 
-// Screens: 'home' | 'breathing' | 'retention' | 'recovery' | 'summary' | 'history'
+const initialProviders = [
+  { provider: 'OpenAI', model: 'Configured server-side', status: 'idle', content: null, latency_ms: 0, error: null },
+  { provider: 'Google Gemini', model: 'Configured server-side', status: 'idle', content: null, latency_ms: 0, error: null },
+  { provider: 'Anthropic Claude', model: 'Configured server-side', status: 'idle', content: null, latency_ms: 0, error: null },
+]
+
+function statusLabel(status) {
+  if (status === 'idle') return 'Waiting'
+  if (status === 'pending') return 'Thinking'
+  if (status === 'success') return 'Success'
+  if (status === 'timeout') return 'Timed out'
+  return 'Error'
+}
+
+function formatLatency(latencyMs) {
+  if (!latencyMs) return '—'
+  if (latencyMs < 1000) return `${latencyMs}ms`
+  return `${(latencyMs / 1000).toFixed(1)}s`
+}
+
+function ModelCard({ response }) {
+  return (
+    <section className={`model-card model-card--${response.status}`}>
+      <div className="model-card__header">
+        <div>
+          <h3>{response.provider}</h3>
+          <p>{response.model}</p>
+        </div>
+        <span className="status-pill">{statusLabel(response.status)}</span>
+      </div>
+      <div className="model-meta">Latency: {formatLatency(response.latency_ms)}</div>
+      {response.status === 'pending' && <p className="muted">Waiting for this model to respond…</p>}
+      {response.content && <pre>{response.content}</pre>}
+      {response.error && <p className="error-text">{response.error}</p>}
+    </section>
+  )
+}
+
 export default function App() {
-  const [screen, setScreen] = useState('home')
-  const [settings, setSettings] = useState({ rounds: 3, breathsPerRound: 30, inhaleDuration: 2000, exhaleDuration: 2000 })
-  const [currentRound, setCurrentRound] = useState(1)
-  const [holdTimes, setHoldTimes] = useState([])
-  const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState(null)
-  const bgMusicRef = useRef(null)
-  const musicUrlRef = useRef(null)
+  const [prompt, setPrompt] = useState('')
+  const [responses, setResponses] = useState(initialProviders)
+  const [synthesis, setSynthesis] = useState(null)
+  const [synthesisStatus, setSynthesisStatus] = useState('idle')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [stillWorking, setStillWorking] = useState(false)
+  const [error, setError] = useState(null)
+  const [history, setHistory] = useState([])
 
-  function startMusic(musicConfig) {
-    stopMusic()
-    if (!musicConfig) return
+  const canSubmit = useMemo(() => prompt.trim().length > 0 && !isSubmitting, [prompt, isSubmitting])
 
-    if (musicConfig.type === 'spotify') {
-      setSpotifyEmbedUrl(musicConfig.embedUrl)
-      return
+  useEffect(() => {
+    fetch('/api/runs')
+      .then(response => response.ok ? response.json() : { runs: [] })
+      .then(data => setHistory(data.runs || []))
+      .catch(() => setHistory([]))
+  }, [])
+
+  async function askCouncil(event) {
+    event.preventDefault()
+    if (!canSubmit) return
+
+    setIsSubmitting(true)
+    setStillWorking(false)
+    setError(null)
+    setSynthesis(null)
+    setSynthesisStatus('pending')
+    setResponses(initialProviders.map(response => ({ ...response, status: 'pending' })))
+
+    const workingTimer = setTimeout(() => setStillWorking(true), 25000)
+
+    try {
+      const response = await fetch('/api/council', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'AI Council request failed')
+      }
+
+      setResponses(data.responses || [])
+      setSynthesis(data.synthesis || null)
+      setSynthesisStatus(data.synthesis_response?.status || (data.synthesis ? 'success' : 'error'))
+      setHistory(previous => [data, ...previous].slice(0, 10))
+    } catch (requestError) {
+      setError(requestError.message)
+      setResponses(initialProviders)
+      setSynthesisStatus('error')
+    } finally {
+      clearTimeout(workingTimer)
+      setStillWorking(false)
+      setIsSubmitting(false)
     }
-
-    musicUrlRef.current = musicConfig.url
-    const audio = new Audio(musicConfig.url)
-    audio.loop = true
-    audio.volume = 0.3
-    audio.play().catch(() => {})
-    bgMusicRef.current = audio
-  }
-
-  function stopMusic() {
-    if (bgMusicRef.current) {
-      bgMusicRef.current.pause()
-      bgMusicRef.current = null
-    }
-    if (musicUrlRef.current) {
-      URL.revokeObjectURL(musicUrlRef.current)
-      musicUrlRef.current = null
-    }
-    setSpotifyEmbedUrl(null)
-  }
-
-  // Clean up music on unmount
-  useEffect(() => () => stopMusic(), [])
-
-  function startSession(newSettings, musicConfig) {
-    setSettings(newSettings)
-    setCurrentRound(1)
-    setHoldTimes([])
-    startMusic(musicConfig)
-    setScreen('breathing')
-  }
-
-  function onBreathingDone() {
-    setScreen('retention')
-  }
-
-  function onRetentionDone(seconds) {
-    setHoldTimes(prev => [...prev, seconds])
-    setScreen('recovery')
-  }
-
-  function onRecoveryDone() {
-    if (currentRound < settings.rounds) {
-      setCurrentRound(r => r + 1)
-      setScreen('breathing')
-    } else {
-      setScreen('summary')
-    }
-  }
-
-  function onSessionSaved() {
-    stopMusic()
-    setScreen('home')
   }
 
   return (
-    <div className="app">
-      {spotifyEmbedUrl && (
-        <div className="spotify-player-shell">
-          <p className="spotify-player-note">Spotify background audio (press play once)</p>
-          <iframe
-            src={spotifyEmbedUrl}
-            title="Spotify player"
-            width="100%"
-            height="152"
-            frameBorder="0"
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            loading="lazy"
-          />
+    <main className="app-shell">
+      <section className="hero">
+        <p className="eyebrow">MVP</p>
+        <h1>AI Council</h1>
+        <p className="hero-copy">
+          Submit one prompt. OpenAI, Gemini, and Claude answer in parallel. Claude then synthesizes the strongest final answer with agreements, disagreements, and uncertainty called out.
+        </p>
+      </section>
+
+      <form className="prompt-panel" onSubmit={askCouncil}>
+        <label htmlFor="prompt">Your prompt</label>
+        <textarea
+          id="prompt"
+          value={prompt}
+          onChange={event => setPrompt(event.target.value)}
+          placeholder="Ask a question that would benefit from multiple expert perspectives…"
+          rows={7}
+          maxLength={6000}
+        />
+        <div className="prompt-actions">
+          <span>{prompt.length}/6000 characters</span>
+          <button type="submit" disabled={!canSubmit}>{isSubmitting ? 'Asking council…' : 'Ask the council'}</button>
         </div>
+        {stillWorking && <div className="working-banner">Still working… some providers can take up to about 90 seconds.</div>}
+        {error && <div className="error-banner">{error}</div>}
+      </form>
+
+      <section className="response-grid" aria-live="polite">
+        {responses.map(response => <ModelCard key={response.provider} response={response} />)}
+      </section>
+
+      <section className={`synthesis-panel synthesis-panel--${synthesisStatus}`}>
+        <div className="synthesis-panel__header">
+          <div>
+            <p className="eyebrow">Claude synthesis</p>
+            <h2>Final answer</h2>
+          </div>
+          <span className="status-pill">{statusLabel(synthesisStatus)}</span>
+        </div>
+        {synthesisStatus === 'pending' && <p className="muted">Claude will compare the returned model responses after they finish.</p>}
+        {synthesis ? <pre>{synthesis}</pre> : synthesisStatus === 'error' && <p className="error-text">Synthesis unavailable. Raw model responses are shown above.</p>}
+      </section>
+
+      {history.length > 0 && (
+        <section className="history-panel">
+          <h2>Recent council runs</h2>
+          <div className="history-list">
+            {history.map(run => (
+              <article key={run.id}>
+                <p>{run.prompt}</p>
+                <span>{new Date(run.created_at).toLocaleString()} · {run.responses?.filter(item => item.status === 'success').length || 0}/3 successful</span>
+              </article>
+            ))}
+          </div>
+        </section>
       )}
-      {screen === 'home' && (
-        <HomeScreen
-          onStart={startSession}
-          onHistory={() => setScreen('history')}
-        />
-      )}
-      {screen === 'breathing' && (
-        <BreathingScreen
-          round={currentRound}
-          totalRounds={settings.rounds}
-          breathsPerRound={settings.breathsPerRound}
-          inhaleDuration={settings.inhaleDuration}
-          exhaleDuration={settings.exhaleDuration}
-          onDone={onBreathingDone}
-        />
-      )}
-      {screen === 'retention' && (
-        <RetentionScreen
-          round={currentRound}
-          totalRounds={settings.rounds}
-          onDone={onRetentionDone}
-        />
-      )}
-      {screen === 'recovery' && (
-        <RecoveryScreen
-          round={currentRound}
-          totalRounds={settings.rounds}
-          onDone={onRecoveryDone}
-        />
-      )}
-      {screen === 'summary' && (
-        <SummaryScreen
-          holdTimes={holdTimes}
-          onSave={onSessionSaved}
-        />
-      )}
-      {screen === 'history' && (
-        <HistoryScreen onBack={() => setScreen('home')} />
-      )}
-    </div>
+    </main>
   )
 }
